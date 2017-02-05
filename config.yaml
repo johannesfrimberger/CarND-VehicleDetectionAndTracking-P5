@@ -1,0 +1,20 @@
+Common:
+  Visualization: True
+Video:
+  Process: True
+  InputFile:
+    - data/videos/project_video.mp4
+    #- data/videos/challenge_video.mp4
+    #- data/videos/harder_challenge_video.mp4
+  StorageFolder: results/videos
+  TrackLanes: True
+Image:
+  Process: True
+  InputFolder: data/images
+  Pattern: test
+  StorageFolder: results/images
+Classifier:
+  UseStoredFile: True
+  Folder: results/classifier
+SlidingWindow:
+  nWindows: 5
