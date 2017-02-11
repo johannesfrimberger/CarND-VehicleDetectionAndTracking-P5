@@ -18,6 +18,7 @@ The goals / steps of this project are the following:
 [image6]: ./results/labels_map.png
 [image7]: ./results/output_bboxes.png
 [video1]: ./results/project_video.mp4
+[video2]: ./results/project_video_combined.mp4
 
 ---
 
@@ -92,3 +93,9 @@ Here's an example result showing the heatmap from a series of frames of video, t
 -
 -
 -
+
+---
+
+###Combined LaneDetection and VehicleTracking
+
+Here's a [link to my video result](./project_video_combined.mp4)

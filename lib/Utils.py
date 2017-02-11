@@ -135,9 +135,9 @@ def color_hist(img, n_bins=32, bins_range=(0, 256)):
     :return:
     """
     # Compute the histogram of the color channels separately
-    channel1_hist = np.histogram(img[:, :, 0], bins=n_bins, range=bins_range)
-    channel2_hist = np.histogram(img[:, :, 1], bins=n_bins, range=bins_range)
-    channel3_hist = np.histogram(img[:, :, 2], bins=n_bins, range=bins_range)
+    channel1_hist = np.histogram(img[:, :, 0], bins=n_bins, range=(0, 360))
+    channel2_hist = np.histogram(img[:, :, 1], bins=n_bins, range=(0, 1))
+    channel3_hist = np.histogram(img[:, :, 2], bins=n_bins, range=(0, 1))
 
     # Concatenate the histograms into a single feature vector
     hist_features = np.concatenate((channel1_hist[0], channel2_hist[0], channel3_hist[0]))

@@ -1,4 +1,4 @@
-#
+# Import static methods in Utils.py file
 from lib.Utils import *
 
 # Image processing
@@ -16,10 +16,9 @@ from sklearn.externals import joblib
 # Import everything needed to edit/save/watch video clips
 from moviepy.editor import *
 
-#
+# Import common python modules
 import os
 import glob
-import csv
 import random as rng
 from tqdm import tqdm
 import time
@@ -39,17 +38,17 @@ class VehicleDetection:
         self.visualization = settings["Visualization"]
 
         # Define HOG parameters
-        self.orient = 9
-        self.pix_per_cell = 8
-        self.cell_per_block = 2
+        self.orient = None
+        self.pix_per_cell = None
+        self.cell_per_block = None
 
         # Define color hist parameters
         self.n_bins = 32
         self.bins_range = (0, 256)
 
-        #
-        self.prediction_class = 0
-        self.scaler = 0
+        # Internal storage of prediction method and scaling
+        self.prediction_class = None
+        self.scaler = None
 
     def get_features(self, img):
         """
@@ -64,7 +63,7 @@ class VehicleDetection:
                                         cell_per_block=self.cell_per_block)
 
         #
-        color_features = color_hist(img, n_bins=self.n_bins, bins_range=self.bins_range)
+        color_features = color_hist(cv2.cvtColor(img, cv2.COLOR_RGB2HLS), n_bins=self.n_bins, bins_range=self.bins_range)
 
         # Normalize hog and color features separately and return feature vector containing both
         return np.concatenate((hog_features, color_features))
@@ -91,7 +90,7 @@ class VehicleDetection:
         """
 
         # Use these two images for visualization
-        img_vehicle = mpimg.imread("data/ProjectData/vehicles/GTI_Far/image0065.png")
+        img_vehicle = mpimg.imread("data/ProjectData/vehicles/GTI_Left/image0034.png")
         img_non_vehicle = mpimg.imread("data/ProjectData/non-vehicles/GTI/image5.png")
 
         # Visualize both images
@@ -111,41 +110,114 @@ class VehicleDetection:
         # Plot features
         img_vehicle_gray = cv2.cvtColor(img_vehicle, cv2.COLOR_RGB2GRAY)
         img_non_vehicle_gray = cv2.cvtColor(img_non_vehicle, cv2.COLOR_RGB2GRAY)
+        img_vehicle_hls = cv2.cvtColor(img_vehicle, cv2.COLOR_RGB2HLS)
+        img_non_vehicle_hls = cv2.cvtColor(img_non_vehicle, cv2.COLOR_RGB2HLS)
 
         filename = os.path.join(folder, "overview_features.png")
         font_size = 6
 
-        hog_features, hog_image = get_hog_features(img_vehicle_gray, orient=self.orient,
-                                               pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
-                                               vis=True)
+        hog_features, hog_image_vehicle = get_hog_features(img_vehicle_gray, orient=self.orient, pix_per_cell=self.pix_per_cell,
+                                                           cell_per_block=self.cell_per_block, vis=True)
 
         fig = plt.subplot(4, 4, 1)
-        plt.imshow(one_channel_to_gray(img_vehicle_gray))
+        plt.imshow(img_vehicle_gray, cmap='gray')
         fig.axes.get_xaxis().set_visible(False)
         fig.axes.get_yaxis().set_visible(False)
         plt.title("Vehicle Grayscale", fontsize=font_size)
 
         fig = plt.subplot(4, 4, 2)
-        plt.imshow(one_channel_to_gray(hog_image) * 255)
+        plt.imshow(hog_image_vehicle, cmap='gray')
         fig.axes.get_xaxis().set_visible(False)
         fig.axes.get_yaxis().set_visible(False)
         plt.title("Vehicle Grayscale HOG", fontsize=font_size)
 
-        hog_features, hog_image = get_hog_features(img_non_vehicle_gray, orient=self.orient,
+        hog_features, hog_image_non_vehicle = get_hog_features(img_non_vehicle_gray, orient=self.orient,
                                                    pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
                                                    vis=True)
 
         fig = plt.subplot(4, 4, 3)
-        plt.imshow(one_channel_to_gray(img_non_vehicle_gray))
+        plt.imshow(img_non_vehicle_gray, cmap='gray')
         fig.axes.get_xaxis().set_visible(False)
         fig.axes.get_yaxis().set_visible(False)
         plt.title("Non-Vehicle Grayscale", fontsize=font_size)
 
         fig = plt.subplot(4, 4, 4)
-        plt.imshow(one_channel_to_gray(hog_image) * 255)
+        plt.imshow(hog_image_non_vehicle, cmap='gray')
         fig.axes.get_xaxis().set_visible(False)
         fig.axes.get_yaxis().set_visible(False)
         plt.title("Non-Vehicle Grayscale HOG", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 5)
+        plt.imshow(img_vehicle_hls[:, :, 0], cmap='gray')
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Vehicle H-Channel", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 6)
+        plt.hist(img_vehicle_hls[:, :, 0], bins=self.n_bins)
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Vehicle H-Channel Histogram", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 7)
+        plt.imshow(img_non_vehicle_hls[:, :, 0], cmap='gray')
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Non-Vehicle H-Channel", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 8)
+        plt.hist(img_non_vehicle_hls[:, :, 0], bins=self.n_bins)
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Non-Vehicle H-Channel Histogram", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 9)
+        plt.imshow(img_vehicle_hls[:, :, 1], cmap='gray')
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Vehicle L-Channel", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 10)
+        plt.hist(img_vehicle_hls[:, :, 1], bins=self.n_bins)
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Vehicle L-Channel Histogram", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 11)
+        plt.imshow(img_non_vehicle_hls[:, :, 1], cmap='gray')
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Non-Vehicle L-Channel", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 12)
+        plt.hist(img_non_vehicle_hls[:, :, 1], bins=self.n_bins)
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Non-Vehicle L-Channel Histogram", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 13)
+        plt.imshow(img_vehicle_hls[:, :, 2], cmap='gray')
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Vehicle S-Channel", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 14)
+        plt.hist(img_vehicle_hls[:, :, 2], bins=self.n_bins)
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Vehicle S-Channel Histogram", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 15)
+        plt.imshow(img_non_vehicle_hls[:, :, 2], cmap='gray')
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Non-Vehicle S-Channel", fontsize=font_size)
+
+        fig = plt.subplot(4, 4, 16)
+        plt.hist(img_non_vehicle_hls[:, :, 2], bins=self.n_bins)
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.title("Non-Vehicle S-Channel Histogram", fontsize=font_size)
 
         plt.savefig(filename, bbox_inches='tight', dpi=200)
 
@@ -268,6 +340,11 @@ class VehicleDetection:
         # Set filename to store camera calibration information
         storage_file = os.path.join(settings["Folder"], "classifier.p")
         file_exists = os.path.isfile(storage_file)
+
+        # Update internal settings for classifier
+        self.orient = settings["Orientation"]
+        self.pix_per_cell = settings["PixelPerCell"]
+        self.cell_per_block = settings["CellPerBlock"]
 
         if self.visualization:
             print("Storing Visualization for Training Classifier")

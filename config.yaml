@@ -1,5 +1,5 @@
 Common:
-  Visualization: True
+  Visualization: False
 Video:
   Process: True
   InputFile:
@@ -14,7 +14,10 @@ Image:
   Pattern: test
   StorageFolder: results/images
 Classifier:
-  UseStoredFile: True
+  UseStoredFile: False
   Folder: results/classifier
+  Orientation: 8
+  PixelPerCell: 8
+  CellPerBlock: 2
 SlidingWindow:
   nWindows: 5
