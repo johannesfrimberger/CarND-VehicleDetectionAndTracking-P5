@@ -36,6 +36,7 @@ class VehicleDetection:
         """
         # Store common settings
         self.visualization = settings["Visualization"]
+        self.color_space = settings["ColorSpace"]
 
         # Define HOG parameters
         self.orient = None
@@ -50,6 +51,25 @@ class VehicleDetection:
         self.prediction_class = None
         self.scaler = None
 
+    def __update_sliding_window_settings(self, settings):
+        """
+
+        :param settings:
+        """
+        data = eval(settings["xyWindow"])
+        if isinstance(data[0], int):
+            data = [data]
+        self.xy_window = data
+        self.xy_overlap = eval(settings["xyOverlap"])
+
+    def __get_hog_features(self, img):
+        return get_hog_features(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY), orient=self.orient,
+                                pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block)
+
+    def __get_color_hist_features(self, img):
+        return color_hist(cv2.cvtColor(img, cvt_color_string_to_cv2(self.color_space)),
+                          n_bins=self.n_bins, bins_range=self.bins_range)
+
     def get_features(self, img):
         """
 
@@ -58,20 +78,19 @@ class VehicleDetection:
         """
 
         # Cvt image to grayscale and calculate HOG features
-        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        hog_features = get_hog_features(gray, orient=self.orient, pix_per_cell=self.pix_per_cell,
-                                        cell_per_block=self.cell_per_block)
+        hog_features = self.__get_hog_features(img)
 
-        #
-        color_features = color_hist(cv2.cvtColor(img, cv2.COLOR_RGB2HLS), n_bins=self.n_bins, bins_range=self.bins_range)
+        # Get histogram of gradients color features
+        color_features = self.__get_color_hist_features(img)
 
-        # Normalize hog and color features separately and return feature vector containing both
+        # Return feature vector containing both
         return np.concatenate((hog_features, color_features))
 
     def pre_process_inputs(self, all_data):
         """
 
-        :return:
+        :param all_data: Input tuple of
+        :return: Tuple of features and corresponding labels
         """
         features = []
         labels = []
@@ -110,8 +129,8 @@ class VehicleDetection:
         # Plot features
         img_vehicle_gray = cv2.cvtColor(img_vehicle, cv2.COLOR_RGB2GRAY)
         img_non_vehicle_gray = cv2.cvtColor(img_non_vehicle, cv2.COLOR_RGB2GRAY)
-        img_vehicle_hls = cv2.cvtColor(img_vehicle, cv2.COLOR_RGB2HLS)
-        img_non_vehicle_hls = cv2.cvtColor(img_non_vehicle, cv2.COLOR_RGB2HLS)
+        img_vehicle_hls = cv2.cvtColor(img_vehicle, cvt_color_string_to_cv2(self.color_space))
+        img_non_vehicle_hls = cv2.cvtColor(img_non_vehicle, cvt_color_string_to_cv2(self.color_space))
 
         filename = os.path.join(folder, "overview_features.png")
         font_size = 6
@@ -221,14 +240,13 @@ class VehicleDetection:
 
         plt.savefig(filename, bbox_inches='tight', dpi=200)
 
-    def __train_classifier(self, use_udacity_data=False):
+    def __train_classifier(self):
         """
 
-        :return:
         """
 
         # Read labeled dataset
-        if use_udacity_data:
+        if False:
             pd_non_vehicle, pd_vehicle = self.read_udacity_data("data/Udacity")
         else:
             pd_non_vehicle = read_project_data(folder="data/ProjectData/non-vehicles", label=0)
@@ -248,6 +266,7 @@ class VehicleDetection:
         # Determine number of elements
         n_elements = min(n_elements_vehicle, n_elements_non_vehicle)
 
+        # Take same number of
         print("Number of samples used for training: {}".format(2*n_elements))
         all_data = np.concatenate((pd_vehicle[0:n_elements], pd_non_vehicle[0:n_elements]))
         rng.shuffle(all_data)
@@ -265,6 +284,7 @@ class VehicleDetection:
 
         # Use a linear SVC
         svc = LinearSVC()
+
         # Check the training time for the SVC
         t = time.time()
         svc.fit(train_features, train_labels)
@@ -277,7 +297,7 @@ class VehicleDetection:
 
         # Check the prediction time for a single sample
         t = time.time()
-        prediction = svc.predict(test_features[0].reshape(1, -1))
+        svc.predict(test_features[0].reshape(1, -1))
         t2 = time.time()
         print(t2 - t, 'Seconds to predict with SVC')
 
@@ -285,20 +305,11 @@ class VehicleDetection:
         self.scaler = scaler
 
     def find_vehicles(self, img):
-        s = 64
+        hog_features = self.__get_hog_features(img)
+        color_img = self.slide_window(img, hog_features, y_start_stop=[360, None])
+        return color_img
 
-        window_img = np.copy(img)
-        while s >= 64:
-            #print(img.shape)
-            window_img = self.slide_window(img, window_img, xy_window=(s, s), y_start_stop=[300, None])
-            #print(windows)
-            s = np.int(s/2)
-            #window_img = draw_boxes(window_img, windows, color=(0, 0, 255), thick=6)
-
-        return window_img
-
-    def slide_window(self, img, window_img, x_start_stop=[None, None], y_start_stop=[None, None],
-                     xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
+    def slide_window(self, img, hog_features, x_start_stop=[None, None], y_start_stop=[None, None]):
 
         # If x and/or y start/stop positions not defined, set to image size
         if x_start_stop[0] == None:
@@ -310,25 +321,46 @@ class VehicleDetection:
         if y_start_stop[1] == None:
             y_start_stop[1] = img.shape[0]
 
-        step_x = np.int(xy_window[0] * xy_overlap[0])
-        step_y = np.int(xy_window[1] * xy_overlap[1])
-
         # Initialize a list to append window positions to
         window_list = []
 
-        for y_left in range(y_start_stop[0], y_start_stop[1] - xy_window[1], step_y):
-            for x_left in range(x_start_stop[0], x_start_stop[1] - xy_window[0], step_x):
-                # Append window position to list
-                window_list.append(((x_left, y_left), (x_left + xy_window[0], y_left + xy_window[1])))
-                data = img[y_left:(y_left + xy_window[1]), x_left:(x_left + xy_window[0])]
+        # Shorten access to internal variables
+        xy_overlap = self.xy_overlap
 
-                features = np.asarray(self.get_features(cv2.resize(data, (64, 64))))
-                features = self.scaler.transform(features.reshape(1, -1))
-                #print(features.shape)
-                pred = self.prediction_class.predict(features.reshape(1, -1))
+        for xy_window in self.xy_window:
+            # Compute the span of the region to be searched
+            xspan = x_start_stop[1] - x_start_stop[0]
+            yspan = y_start_stop[1] - y_start_stop[0]
 
-                if int(pred[0]) > 0:
-                    window_img = draw_boxes(window_img, [((x_left, y_left), (x_left + xy_window[0], y_left + xy_window[1]))], color=(0, 0, 255), thick=6)
+            # Compute the number of pixels per step in x/y
+            nx_pix_per_step = np.int(xy_window[0] * (1 - xy_overlap[0]))
+            ny_pix_per_step = np.int(xy_window[1] * (1 - xy_overlap[1]))
+
+            # Compute the number of windows in x/y
+            nx_windows = np.int(xspan / nx_pix_per_step)
+            ny_windows = np.int(yspan / ny_pix_per_step)
+
+            # Loop through finding x and y window positions
+            for ys in range(ny_windows):
+                for xs in range(nx_windows):
+                    # Calculate window position
+                    startx = xs * nx_pix_per_step + x_start_stop[0]
+                    endx = (xs + 1) * nx_pix_per_step + x_start_stop[0]
+                    starty = ys * ny_pix_per_step + y_start_stop[0]
+                    endy = (ys + 1) * ny_pix_per_step + y_start_stop[0]
+
+                    data = cv2.resize(img[starty:endy, startx:endx], (64, 64))
+                    features = self.get_features(data)
+                    features = self.scaler.transform(features)
+                    prediction = self.prediction_class.predict(features.reshape(1, -1))
+                    #color_features = self.__get_color_hist_features(data)
+
+                    # Append window position to list
+                    if eval(prediction[0]) > 0:
+                        window_list.append(((startx, starty), (endx, endy)))
+
+        window_img = np.copy(img)
+        window_img = draw_boxes(window_img, window_list, color=(0, 0, 255), thick=6)
 
         return window_img
 
@@ -338,17 +370,13 @@ class VehicleDetection:
         :param settings:
         """
         # Set filename to store camera calibration information
-        storage_file = os.path.join(settings["Folder"], "classifier.p")
+        storage_file = os.path.join(settings["Folder"], "classifier_{}.p".format(self.color_space))
         file_exists = os.path.isfile(storage_file)
 
         # Update internal settings for classifier
         self.orient = settings["Orientation"]
         self.pix_per_cell = settings["PixelPerCell"]
         self.cell_per_block = settings["CellPerBlock"]
-
-        if self.visualization:
-            print("Storing Visualization for Training Classifier")
-            self.__visualize_classifier(settings["Folder"])
 
         # Either load existing classifier or train classifier
         if settings["UseStoredFile"] and file_exists:
@@ -360,53 +388,56 @@ class VehicleDetection:
             print("Start training classifier")
             self.__train_classifier()
             storage = {
+                "ColorSpace": self.color_space,
                 "SVM": self.prediction_class,
                 "Scaler": self.scaler
             }
             os.makedirs(os.path.dirname(storage_file), exist_ok=True)
             pickle.dump(storage, open(storage_file, "wb"))
 
-    def process_image_folder(self, settings):
-        """
-        :param settings:
-        :return:
+            if self.visualization:
+                print("Storing Visualization for Training Classifier")
+                self.__visualize_classifier(settings["Folder"])
+
+    def process_image_folder(self, settings, settings_sliding_window):
         """
 
+        :param settings:
+        :param settings_sliding_window:
+        """
         # Read settings
-        input_folder = "data/images"
-        storage_folder = "results/images"
-        pattern = "test"
+        input_folder = settings["InputFolder"]
+        storage_folder = settings["StorageFolder"]
+        pattern = settings["Pattern"]
+        self.__update_sliding_window_settings(settings_sliding_window)
 
         # Find all images in given folder
-        allImages = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
+        all_images = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
 
-        print("Start processing images {} in folder {} with pattern {}".format(len(allImages), input_folder, pattern))
+        print("Start processing images {} in folder {} with pattern {}".format(len(all_images), input_folder, pattern))
 
         # Iterate over all images
-        for file_name in tqdm(allImages, unit="Image"):
+        for file_name in tqdm(all_images, unit="Image"):
             output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
             img = mpimg.imread(file_name)
             mpimg.imsave(output_file, self.find_vehicles(img))
 
-    def process_videos(self):
+    def process_videos(self, settings, settings_sliding_window):
         """
 
         :param settings:
-        :return:
+        :param settings_sliding_window:
         """
-
-        file_names = ["data/videos/short_project_video.mp4"]
-        storage_folder = "results/videos"
+        file_names = settings["InputFile"]
+        storage_folder = settings["StorageFolder"]
+        self.__update_sliding_window_settings(settings_sliding_window)
 
         for file_name in file_names:
             output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
             print("Start processing video {} and save it as {}".format(file_name, output_file))
-
             input = VideoFileClip(file_name)
             output = input.fl_image(self.find_vehicles)
             output.write_videofile(output_file, audio=False)
-
-

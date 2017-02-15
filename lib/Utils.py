@@ -2,10 +2,16 @@ import numpy as np
 import os
 import glob
 import cv2
+import csv
 from skimage.feature import hog
 
 
 def one_channel_to_gray(image):
+    """
+    Convert single channel grayscale image to 3 channel color image
+    :param image: Grayscale image with one channel
+    :return: Grayscale image with three channels
+    """
     return np.dstack((image, image, image))
 
 
@@ -18,6 +24,7 @@ def get_image_in_bbox(img, bbox):
     """
     el1, el2 = bbox
     return img[el1[1]:el2[1], el1[0]:el2[0]]
+
 
 def read_project_data(folder, label):
     """
@@ -37,6 +44,11 @@ def read_project_data(folder, label):
 
 
 def read_udacity_data(folder):
+    """
+
+    :param folder:
+    :return:
+    """
     non_vehicle = []
     vehicle = []
 
@@ -79,6 +91,7 @@ def read_udacity_data(folder):
                             non_vehicle.append((os.path.join(root, filename), 0, bbox))
 
     return non_vehicle, vehicle
+
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     """
@@ -129,7 +142,7 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block,
 def color_hist(img, n_bins=32, bins_range=(0, 256)):
     """
 
-    :param img:
+    :param img: Image with 3 color channels
     :param n_bins:
     :param bins_range:
     :return:
@@ -144,3 +157,17 @@ def color_hist(img, n_bins=32, bins_range=(0, 256)):
 
     # Return the individual histograms, bin_centers and feature vector
     return hist_features
+
+
+def cvt_color_string_to_cv2(input_string):
+    """
+    Convert input color string to cv2 conversion method
+    :param input_string:
+    :return: cv2 conversion method
+    """
+    if input_string == "RGB":
+        return cv2.COLOR_RGB2BGR
+    elif input_string == "HLS":
+        return cv2.COLOR_RGB2HLS
+    else:
+        return None

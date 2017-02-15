@@ -1,17 +1,18 @@
 Common:
   Visualization: False
+  ColorSpace: HLS
 Video:
-  Process: True
+  Process: False
   InputFile:
-    - data/videos/project_video.mp4
+    - data/videos/short_project_video.mp4
+    #- data/videos/project_video.mp4
     #- data/videos/challenge_video.mp4
     #- data/videos/harder_challenge_video.mp4
   StorageFolder: results/videos
-  TrackLanes: True
 Image:
-  Process: True
+  Process: False
   InputFolder: data/images
-  Pattern: test
+  Pattern: test0
   StorageFolder: results/images
 Classifier:
   UseStoredFile: False
@@ -20,4 +21,5 @@ Classifier:
   PixelPerCell: 8
   CellPerBlock: 2
 SlidingWindow:
-  nWindows: 5
+  xyWindow: (128, 128), (64, 64)
+  xyOverlap: (0.5, 0.5)
