@@ -113,6 +113,24 @@ def draw_boxes(img, boxes, color=(0, 0, 255), thickness=6):
     return draw_img
 
 
+def label_to_bbox(label, car_number):
+    """
+    Convert output from scipy.ndimage.measurements's label function to bounding box
+    :param label: Current label
+    :param car_number: Car index for which bounding box should be generated
+    :return: bounding box for this car
+    """
+    # Find pixels with each car_number label value
+    nonzero = (label == car_number).nonzero()
+
+    # Identify x and y values of those pixels
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+
+    # Define a bounding box based on min/max x and y
+    return (np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy))
+
+
 def draw_labeled_box(img, labels):
     """
     Draw bounding box around labeled vehicles detected in an image
@@ -123,13 +141,7 @@ def draw_labeled_box(img, labels):
 
     # Iterate through all detected cars
     for car_number in range(1, labels[1] + 1):
-        # Find pixels with each car_number label value
-        nonzero = (labels[0] == car_number).nonzero()
-        # Identify x and y values of those pixels
-        nonzeroy = np.array(nonzero[0])
-        nonzerox = np.array(nonzero[1])
-        # Define a bounding box based on min/max x and y
-        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        bbox = label_to_bbox(labels[0], car_number)
         # Draw the box on the image
         cv2.rectangle(img, bbox[0], bbox[1], (0, 0, 255), 6)
 
