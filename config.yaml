@@ -1,8 +1,8 @@
 Common:
   Visualization: False
-  ColorSpace: HLS
+  ColorSpace: YCRCB
 Video:
-  Process: False
+  Process: True
   InputFile:
     - data/videos/short_project_video.mp4
     #- data/videos/project_video.mp4
@@ -12,14 +12,16 @@ Video:
 Image:
   Process: False
   InputFolder: data/images
-  Pattern: test0
+  Pattern: test
   StorageFolder: results/images
 Classifier:
-  UseStoredFile: False
+  UseStoredFile: True
   Folder: results/classifier
-  Orientation: 8
+  Orientation: 9
   PixelPerCell: 8
   CellPerBlock: 2
+  HogChannel: -1
+  SpatialSize: (16,16)
 SlidingWindow:
-  xyWindow: (128, 128), (64, 64)
+  xyWindow: (256, 256), (128, 128), (96, 96)
   xyOverlap: (0.5, 0.5)

@@ -4,6 +4,13 @@ import glob
 import cv2
 import csv
 from skimage.feature import hog
+import matplotlib.pyplot as plt
+
+def apply_threshold(img, threshold):
+    # Zero out pixels below the threshold
+    img[img <= threshold] = 0
+    # Return thresholded map
+    return img
 
 
 def one_channel_to_gray(image):
@@ -112,6 +119,16 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
 
     return draw_img
 
+def draw_labeled_box(img, labels, color=(0, 0, 255), thick=6):
+    for car_number in range(1, labels[1]+1):
+        non_zero = (labels[0] == car_number).nonzero()
+        non_zero_y = np.array(non_zero[0])
+        non_zero_x = np.array(non_zero[1])
+
+        bbox = ((np.min(non_zero_x), np.min(non_zero_y)), (np.max(non_zero_x), np.max(non_zero_y)))
+        cv2.rectangle(img, bbox[0], bbox[1], color, thick)
+
+    return img
 
 def get_hog_features(img, orient, pix_per_cell, cell_per_block,
                      vis=False, feature_vec=True):
@@ -139,18 +156,17 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block,
         return features
 
 
-def color_hist(img, n_bins=32, bins_range=(0, 256)):
+def color_hist(img, n_bins=32):
     """
 
     :param img: Image with 3 color channels
     :param n_bins:
-    :param bins_range:
+    :param color_space:
     :return:
     """
-    # Compute the histogram of the color channels separately
-    channel1_hist = np.histogram(img[:, :, 0], bins=n_bins, range=(0, 360))
-    channel2_hist = np.histogram(img[:, :, 1], bins=n_bins, range=(0, 1))
-    channel3_hist = np.histogram(img[:, :, 2], bins=n_bins, range=(0, 1))
+    channel1_hist = np.histogram(img[:, :, 0], bins=n_bins)
+    channel2_hist = np.histogram(img[:, :, 1], bins=n_bins)
+    channel3_hist = np.histogram(img[:, :, 2], bins=n_bins)
 
     # Concatenate the histograms into a single feature vector
     hist_features = np.concatenate((channel1_hist[0], channel2_hist[0], channel3_hist[0]))
@@ -169,5 +185,24 @@ def cvt_color_string_to_cv2(input_string):
         return cv2.COLOR_RGB2BGR
     elif input_string == "HLS":
         return cv2.COLOR_RGB2HLS
+    elif input_string == "HSV":
+        return cv2.COLOR_RGB2HSV
+    elif input_string == "YCRCB":
+        return cv2.COLOR_RGB2YCR_CB
     else:
         return None
+
+
+def bin_spatial(img, size=(32, 32)):
+    """
+    R
+    :param img:
+    :param size:
+    :return: Return stacked feature vector of the three color channel
+    """
+    color1 = cv2.resize(img[:, :, 0], size).ravel()
+    color2 = cv2.resize(img[:, :, 1], size).ravel()
+    color3 = cv2.resize(img[:, :, 2], size).ravel()
+
+    return np.hstack((color1, color2, color3))
+
