@@ -3,13 +3,17 @@ import os
 import glob
 import cv2
 import csv
-from skimage.feature import hog
 import matplotlib.pyplot as plt
 
 def apply_threshold(img, threshold):
+    """
+
+    :param img: Single channel 2d array
+    :param threshold:
+    :return:
+    """
     # Zero out pixels below the threshold
     img[img <= threshold] = 0
-    # Return thresholded map
     return img
 
 
@@ -22,22 +26,11 @@ def one_channel_to_gray(image):
     return np.dstack((image, image, image))
 
 
-def get_image_in_bbox(img, bbox):
-    """
-    Return the
-    :param img:
-    :param bbox:
-    :return:
-    """
-    el1, el2 = bbox
-    return img[el1[1]:el2[1], el1[0]:el2[0]]
-
-
 def read_project_data(folder, label):
     """
-
-    :param folder:
-    :param label:
+    Read labeled from KTTI dataset
+    :param folder: Folder where to look for images
+    :param label: Label that these image have (0: no vehicle, 1: vehicle)
     :return: tuple consisting of path to image and label
     """
     data = []
@@ -52,9 +45,9 @@ def read_project_data(folder, label):
 
 def read_udacity_data(folder):
     """
-
-    :param folder:
-    :return:
+    Read labeled vehicle and non_vehicle data from udacity data
+    :param folder: Location of data
+    :return: tuple consisting of path to image and label for non_vehicle and vehicle data
     """
     non_vehicle = []
     vehicle = []
@@ -100,85 +93,54 @@ def read_udacity_data(folder):
     return non_vehicle, vehicle
 
 
-def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
+def draw_boxes(img, boxes, color=(0, 0, 255), thickness=6):
     """
-
-    :param img:
-    :param bboxes:
-    :param color:
-    :param thick:
+    Draw
+    :param img: Image in which bounding boxes should be drawn
+    :param boxes: Bounding boxes that should be drawn
+    :param color: Color used for bounding box as 3-RGB-tupel (Default: (0, 0, 255) / Blue)
+    :param thickness: Thickness used for lines of bounding box
     :return:
     """
-    # make a copy of the image
+    # Make a copy of the image
     draw_img = np.copy(img)
 
     # draw each bounding box on your image copy using cv2.rectangle()
     # return the image copy with boxes drawn
-    for el1, el2 in bboxes:
-        cv2.rectangle(draw_img, el1, el2, color, thick)
+    for el1, el2 in boxes:
+        cv2.rectangle(draw_img, el1, el2, color, thickness)
 
     return draw_img
 
-def draw_labeled_box(img, labels, color=(0, 0, 255), thick=6):
-    for car_number in range(1, labels[1]+1):
-        non_zero = (labels[0] == car_number).nonzero()
-        non_zero_y = np.array(non_zero[0])
-        non_zero_x = np.array(non_zero[1])
 
-        bbox = ((np.min(non_zero_x), np.min(non_zero_y)), (np.max(non_zero_x), np.max(non_zero_y)))
-        cv2.rectangle(img, bbox[0], bbox[1], color, thick)
+def draw_labeled_box(img, labels):
+    """
+    Draw bounding box around labeled vehicles detected in an image
+    :param img: Image in which bounding boxes should be drawn
+    :param labels: Vehicle labels as returned by scipy.ndimage.measurements's label function
+    :return: Image with detected vehicles marked by a bounding box
+    """
 
+    # Iterate through all detected cars
+    for car_number in range(1, labels[1] + 1):
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        # Draw the box on the image
+        cv2.rectangle(img, bbox[0], bbox[1], (0, 0, 255), 6)
+
+    # Return the image
     return img
-
-def get_hog_features(img, orient, pix_per_cell, cell_per_block,
-                     vis=False, feature_vec=True):
-    """
-
-    :param img: Grayscale image
-    :param orient:
-    :param pix_per_cell:
-    :param cell_per_block:
-    :param vis:
-    :param feature_vec:
-    :return:
-    """
-    # Call with two outputs if vis==True
-    if vis:
-        features, hog_image = hog(img, orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
-                                  cells_per_block=(cell_per_block, cell_per_block), transform_sqrt=True,
-                                  visualise=vis, feature_vector=feature_vec)
-        return features, hog_image
-    # Otherwise call with one output
-    else:
-        features = hog(img, orientations=orient, pixels_per_cell=(pix_per_cell, pix_per_cell),
-                       cells_per_block=(cell_per_block, cell_per_block), transform_sqrt=True,
-                       visualise=vis, feature_vector=feature_vec)
-        return features
-
-
-def color_hist(img, n_bins=32):
-    """
-
-    :param img: Image with 3 color channels
-    :param n_bins:
-    :param color_space:
-    :return:
-    """
-    channel1_hist = np.histogram(img[:, :, 0], bins=n_bins)
-    channel2_hist = np.histogram(img[:, :, 1], bins=n_bins)
-    channel3_hist = np.histogram(img[:, :, 2], bins=n_bins)
-
-    # Concatenate the histograms into a single feature vector
-    hist_features = np.concatenate((channel1_hist[0], channel2_hist[0], channel3_hist[0]))
-
-    # Return the individual histograms, bin_centers and feature vector
-    return hist_features
 
 
 def cvt_color_string_to_cv2(input_string):
     """
     Convert input color string to cv2 conversion method
-    :param input_string:
+    :param input_string: Color space that should be used
     :return: cv2 conversion method
     """
     if input_string == "RGB":
@@ -193,16 +155,37 @@ def cvt_color_string_to_cv2(input_string):
         return None
 
 
-def bin_spatial(img, size=(32, 32)):
+def plot_images(filename, images, title, rows=None, cols=None, font_size=6):
     """
-    R
-    :param img:
-    :param size:
-    :return: Return stacked feature vector of the three color channel
+    Create a graphic for given list of images
+    :param filename: Store the graphics with this file name
+    :param images: List of images
+    :param title: List of titles for each image
+    :param rows: Number of rows
+    :param cols: Number of columns
+    :param font_size: Font size used in graphics
     """
-    color1 = cv2.resize(img[:, :, 0], size).ravel()
-    color2 = cv2.resize(img[:, :, 1], size).ravel()
-    color3 = cv2.resize(img[:, :, 2], size).ravel()
 
-    return np.hstack((color1, color2, color3))
+    if (rows is None) and (cols is None):
+        rows = len(images)
+        cols = 1
+    elif rows is None:
+        rows = np.int(np.round(np.float(len(images)) / np.float(cols)))
+    elif cols is None:
+        cols = np.int(np.round(np.float(len(images)) / np.float(rows)))
 
+    for i, img in enumerate(images):
+        fig = plt.subplot(rows, cols, i+1)
+
+        # Use hot colormap if image is grayscale
+        if len(img.shape) < 3:
+            plt.imshow(img, cmap='hot')
+        else:
+            plt.imshow(img)
+
+        # Set title and deactivate axis visualization
+        plt.title(title[i], fontsize=font_size)
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+
+    plt.savefig(filename, bbox_inches='tight')

@@ -16,6 +16,9 @@ Image:
   StorageFolder: results/images
 Classifier:
   UseStoredFile: True
+  HogFeatures: True
+  HistFeatures: True
+  SpatialFeatures: True
   Folder: results/classifier
   Orientation: 9
   PixelPerCell: 8

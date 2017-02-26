@@ -1,5 +1,6 @@
 # Import static methods in Utils.py file
 from lib.Utils import *
+from lib.Features import get_spatial_features, get_hog_features, get_color_hist_features
 
 # Image processing
 import cv2
@@ -7,11 +8,9 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 
 # SciKit
-from skimage.feature import hog
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, LinearSVC
-from sklearn.externals import joblib
 from scipy.ndimage.measurements import label
 
 # Import everything needed to edit/save/watch video clips
@@ -25,12 +24,17 @@ from tqdm import tqdm
 import time
 import pickle
 
+
 class VehicleDetection:
     """
 
     """
 
-    def __init__(self, settings):
+    ##############################################################################################################
+    # Init Methods
+    ##############################################################################################################
+
+    def __init__(self, settings, settings_sliding_window):
         """
 
         :param settings:
@@ -52,8 +56,10 @@ class VehicleDetection:
         # Internal storage of prediction method and scaling
         self.prediction_class = None
         self.scaler = None
-
         self.heatmap = None
+
+        # Update sliding window settings
+        self.__update_sliding_window_settings(settings_sliding_window)
 
     def __update_sliding_window_settings(self, settings):
         """
@@ -65,6 +71,10 @@ class VehicleDetection:
             data = [data]
         self.xy_window = data
         self.xy_overlap = eval(settings["xyOverlap"])
+
+    ##############################################################################################################
+    # Wrapper Methods for feature extraction
+    ##############################################################################################################
 
     def __get_hog_features(self, img, feature_vec=True):
 
@@ -87,9 +97,18 @@ class VehicleDetection:
             return ch
 
     def __get_color_hist_features(self, img):
-        return color_hist(img, n_bins=self.n_bins)
+        """
 
-    def get_features(self, img):
+        :param img:
+        :return:
+        """
+        return get_color_hist_features(img, n_bins=self.n_bins)
+
+    ##############################################################################################################
+    # Private Methods
+    ##############################################################################################################
+
+    def __get_features(self, img):
         """
 
         :param img:
@@ -101,7 +120,7 @@ class VehicleDetection:
         converted_img = cv2.cvtColor(img, cvt_color_string_to_cv2(self.color_space))
 
         # Extract spatial features
-        file_features.append(bin_spatial(converted_img, self.spatial_size))
+        file_features.append(get_spatial_features(converted_img, self.spatial_size))
 
         # Extract HOG features
         file_features.append(self.__get_hog_features(converted_img))
@@ -112,9 +131,9 @@ class VehicleDetection:
         # Return feature vector containing both
         return np.concatenate(file_features)
 
-    def pre_process_inputs(self, all_data):
+    def __pre_process_inputs(self, all_data):
         """
-
+        Read all input data
         :param all_data: Input tuple of
         :return: Tuple of features and corresponding labels
         """
@@ -122,7 +141,7 @@ class VehicleDetection:
 
         for el in tqdm(all_data):
             file_name = el[0]
-            features.append(self.get_features(mpimg.imread(file_name)))
+            features.append(self.__get_features(mpimg.imread(file_name)))
 
         return np.asarray(features)
 
@@ -321,30 +340,100 @@ class VehicleDetection:
         self.prediction_class = svc
         self.scaler = X_scaler
 
-    def update_heatmap(self, window_list, threshold):
+    def __detect_vehicles_frame(self, img, draw_img):
+        """
+        Run vehicle detection algorithm on single input image/video frame
+        :param img: Image that should be processed in float
+        :param draw_img: Image used to annotate
+        :return: Annotated image and heatmap
+        """
+        y_start = 400
+        y_stop = 656
+        scale = 1.5
 
-        for el1, el2 in window_list:
-            self.heatmap[el1[1]:el2[1], el1[0]:el2[0]] += 1
+        img_to_search = img[y_start:y_stop, :, :]
 
-        self.heatmap[self.heatmap <= threshold] = 0
+        heatmap = np.zeros_like(img[:, :, 0])
 
-    def draw_labeled_bboxes(self, img, labels):
-        # Iterate through all detected cars
-        for car_number in range(1, labels[1] + 1):
-            # Find pixels with each car_number label value
-            nonzero = (labels[0] == car_number).nonzero()
-            # Identify x and y values of those pixels
-            nonzeroy = np.array(nonzero[0])
-            nonzerox = np.array(nonzero[1])
-            # Define a bounding box based on min/max x and y
-            bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
-            # Draw the box on the image
-            cv2.rectangle(img, bbox[0], bbox[1], (0, 0, 255), 6)
-        # Return the image
-        return img
+        converted_img = cv2.cvtColor(img_to_search, cvt_color_string_to_cv2(self.color_space))
 
-    def find_vehicles(self, img):
-        return img
+        if scale != 1:
+            imshape = converted_img.shape
+            converted_img = cv2.resize(converted_img, (np.int(imshape[1] / scale), np.int(imshape[0] / scale)))
+
+        ch0 = converted_img[:, :, 0]
+        ch1 = converted_img[:, :, 1]
+        ch2 = converted_img[:, :, 2]
+
+        # Define blocks
+        nxblocks = (ch0.shape[1] // self.pix_per_cell) - 1
+        nyblocks = (ch0.shape[0] // self.pix_per_cell) - 1
+
+        window = 64
+        nblocks_per_window = (window // self.pix_per_cell) - 1
+        cells_per_step = 2
+        nxsteps = (nxblocks - nblocks_per_window) // cells_per_step
+        nysteps = (nyblocks - nblocks_per_window) // cells_per_step
+
+        hog0 = get_hog_features(ch0, orient=self.orient,
+                                pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
+                                feature_vec=False)
+        hog1 = get_hog_features(ch1, orient=self.orient,
+                                pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
+                                feature_vec=False)
+        hog2 = get_hog_features(ch2, orient=self.orient,
+                                pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
+                                feature_vec=False)
+
+        for xb in range(nxsteps):
+            for yb in range(nysteps):
+                ypos = yb * cells_per_step
+                xpos = xb * cells_per_step
+
+                hog_feat0 = hog0[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
+                hog_feat1 = hog1[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
+                hog_feat2 = hog2[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
+                hog_features = np.hstack((hog_feat0, hog_feat1, hog_feat2))
+
+                xleft = xpos * self.pix_per_cell
+                ytop = ypos * self.pix_per_cell
+
+                sub_img = cv2.resize(converted_img[ytop:ytop + window, xleft:xleft + window], (64, 64))
+
+                spatial_features = get_spatial_features(sub_img, self.spatial_size)
+                hist_features = self.__get_color_hist_features(sub_img)
+
+                features = self.scaler.transform(
+                    np.hstack((spatial_features, hog_features, hist_features)).reshape(1, -1))
+                prediction = self.prediction_class.predict(features)
+
+                if prediction == 1:
+                    x_box_left = np.int(xleft * scale)
+                    y_top_draw = np.int(ytop * scale)
+                    win_draw = np.int(window * scale)
+
+                    heatmap[y_top_draw + y_start:y_top_draw + y_start + win_draw, x_box_left:x_box_left + win_draw] += 1
+
+        heatmap = apply_threshold(heatmap, 0)
+        labels = label(heatmap)
+
+        result_img = draw_labeled_box(draw_img, labels)
+
+        return result_img, heatmap
+
+    def __detect_vehicles_video(self, img):
+        """
+        Wrapper class for vehicle detection and tracking in video frames
+        :param img: Input image as uint8
+        :return: Annotated image
+        """
+        img_float = img.astype(np.float32) / 255
+        result_img, heatmap = self.__detect_vehicles_frame(img_float, img)
+        return result_img
+
+    ##############################################################################################################
+    # Public Methods
+    ##############################################################################################################
 
     def init_classifier(self, settings):
         """
@@ -383,128 +472,66 @@ class VehicleDetection:
                 print("Storing Visualization for Training Classifier")
                 self.__visualize_classifier(settings["Folder"])
 
-    def process_image_folder(self, settings, settings_sliding_window):
+    def process_image_folder(self, settings):
         """
-
-        :param settings:
-        :param settings_sliding_window:
+        Read video settings and detect vehicles in the images specified in the config file
+        :param settings: Dictionary containing settings from "Image" section in yaml file
         """
-        # Read settings
-        input_folder = settings["InputFolder"]
-        storage_folder = settings["StorageFolder"]
-        pattern = settings["Pattern"]
-        self.__update_sliding_window_settings(settings_sliding_window)
+        # Check if all images in a folder should be processed
+        if settings["Process"]:
+            # Read settings for image processing
+            input_folder = settings["InputFolder"]
+            storage_folder = settings["StorageFolder"]
+            pattern = settings["Pattern"]
 
-        # Find all images in given folder
-        all_images = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
+            # Find all images in given folder
+            all_images = glob.glob(os.path.join(input_folder, "{}*.jpg".format(pattern)))
+            print("Start processing images {} in folder {} with pattern {}".format(len(all_images), input_folder, pattern))
 
-        print("Start processing images {} in folder {} with pattern {}".format(len(all_images), input_folder, pattern))
+            result_imgs = []
+            titles = []
 
-        # Iterate over all images
-        for file_name in tqdm(all_images, unit="Image"):
-            output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
-            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            # Iterate over all images and detect vehicles
+            for file_name in tqdm(all_images, unit="Image"):
 
-            count = 0
-            input = mpimg.imread(file_name)
-            draw_img = np.copy(input)
-            img = input.astype(np.float32)/255
+                # Read image and detect vehicles for this still image
+                img = mpimg.imread(file_name)
+                img_float = img.astype(np.float32) / 255
+                result_img, heatmap = self.__detect_vehicles_frame(img_float, img)
 
-            y_start = 400
-            y_stop = 656
-            scale = 1.5
+                # Determine output filename and store results as an image
+                output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
+                os.makedirs(os.path.dirname(output_file), exist_ok=True)
+                mpimg.imsave(output_file, result_img)
 
-            img_to_search = img[y_start:y_stop, :, :]
+                # Store data for visualization
+                result_imgs.append(result_img)
+                result_imgs.append(heatmap)
+                titles.append('Annotated image for {}'.format(os.path.basename(file_name)))
+                titles.append('Heatmap for {}'.format(os.path.basename(file_name)))
 
-            heatmap = np.zeros_like(img[:, :, 0])
+            if self.visualization:
+                file_name = os.path.join(storage_folder, "overview_still_images.png")
+                plot_images(file_name, result_imgs, titles, cols=2)
 
-            converted_img = cv2.cvtColor(img_to_search, cvt_color_string_to_cv2(self.color_space))
-
-            if scale != 1:
-                imshape = converted_img.shape
-                converted_img = cv2.resize(converted_img, (np.int(imshape[1]/scale), np.int(imshape[0]/scale)))
-
-            ch0 = converted_img[:, :, 0]
-            ch1 = converted_img[:, :, 1]
-            ch2 = converted_img[:, :, 2]
-
-            # Define blocks
-            nxblocks = (ch0.shape[1] // self.pix_per_cell) - 1
-            nyblocks = (ch0.shape[0] // self.pix_per_cell) - 1
-
-            window = 64
-            nblocks_per_window = (window // self.pix_per_cell) - 1
-            cells_per_step = 2
-            nxsteps = (nxblocks - nblocks_per_window) // cells_per_step
-            nysteps = (nyblocks - nblocks_per_window) // cells_per_step
-
-            hog0 = get_hog_features(ch0, orient=self.orient,
-                                   pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
-                                   feature_vec=False)
-            hog1 = get_hog_features(ch1, orient=self.orient,
-                                   pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
-                                   feature_vec=False)
-            hog2 = get_hog_features(ch2, orient=self.orient,
-                                   pix_per_cell=self.pix_per_cell, cell_per_block=self.cell_per_block,
-                                   feature_vec=False)
-
-            for xb in range(nxsteps):
-                for yb in range(nysteps):
-                    count += 1
-                    ypos = yb*cells_per_step
-                    xpos = xb*cells_per_step
-
-                    hog_feat0 = hog0[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel()
-                    hog_feat1 = hog1[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
-                    hog_feat2 = hog2[ypos:ypos + nblocks_per_window, xpos:xpos + nblocks_per_window].ravel()
-                    hog_features = np.hstack((hog_feat0, hog_feat1, hog_feat2))
-
-                    xleft = xpos*self.pix_per_cell
-                    ytop = ypos * self.pix_per_cell
-
-                    sub_img = cv2.resize(converted_img[ytop:ytop+window, xleft:xleft+window], (64, 64))
-
-                    spatial_features = bin_spatial(sub_img, self.spatial_size)
-                    hist_features = self.__get_color_hist_features(sub_img)
-
-                    features = self.scaler.transform(np.hstack((spatial_features, hog_features, hist_features)).reshape(1, -1))
-                    prediction = self.prediction_class.predict(features)
-
-                    if prediction == 1:
-                        x_box_left = np.int(xleft * scale)
-                        y_top_draw = np.int(ytop * scale)
-                        win_draw = np.int(window*scale)
-
-                        cv2.rectangle(draw_img, (x_box_left, y_top_draw+y_start),
-                                      (x_box_left+win_draw, y_top_draw+y_start+win_draw), (0, 0, 255), 6)
-                        heatmap[y_top_draw+y_start:y_top_draw+y_start+win_draw, x_box_left:x_box_left+win_draw] += 1
-
-            heatmap = apply_threshold(heatmap, 1)
-            labels = label(heatmap)
-
-            draw_img = draw_labeled_box(np.copy(input), labels)
-
-            #window_img = draw_boxes(draw_img, detections)
-            mpimg.imsave(output_file, draw_img)
-
-
-    def process_videos(self, settings, settings_sliding_window):
+    def process_videos(self, settings):
         """
-
-        :param settings:
-        :param settings_sliding_window:
+        Read video settings and detect vehicles in the video files specified in the config file
+        :param settings: Dictionary containing settings from "Video" section in yaml file
         """
-        file_names = settings["InputFile"]
-        storage_folder = settings["StorageFolder"]
-        self.__update_sliding_window_settings(settings_sliding_window)
+        # Check if a video should be processed
+        if settings["Process"]:
+            # Read settings for video processing
+            file_names = settings["InputFile"]
+            storage_folder = settings["StorageFolder"]
 
-        self.heatmap = np.zeros(shape=(720, 1080))
+            for file_name in file_names:
+                # Determine output filename
+                output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
+                os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-        for file_name in file_names:
-            output_file = os.path.join(storage_folder, "proc_" + os.path.basename(file_name))
-            os.makedirs(os.path.dirname(output_file), exist_ok=True)
-
-            print("Start processing video {} and save it as {}".format(file_name, output_file))
-            input = VideoFileClip(file_name)
-            output = input.fl_image(self.find_vehicles)
-            output.write_videofile(output_file, audio=False)
+                # Process video
+                print("Start processing video {} and save it as {}".format(file_name, output_file))
+                input = VideoFileClip(file_name)
+                output = input.fl_image(self.__detect_vehicles_video)
+                output.write_videofile(output_file, audio=False)

@@ -18,18 +18,16 @@ def main():
         settings = yaml.load(fi)
 
     # Init vehicle detection class
-    vd = VehicleDetection(settings["Common"])
+    vd = VehicleDetection(settings["Common"], settings["SlidingWindow"])
 
     # Load or train classifier
     vd.init_classifier(settings["Classifier"])
 
-    # Check if all images in a folder should be processed
-    if settings["Image"]["Process"]:
-        vd.process_image_folder(settings["Image"], settings["SlidingWindow"])
+    # Process images
+    vd.process_image_folder(settings["Image"])
 
-    # Check if a video should be processed
-    if settings["Video"]["Process"]:
-        vd.process_videos(settings["Video"], settings["SlidingWindow"])
+    # Process videos
+    vd.process_videos(settings["Video"])
 
 
 if __name__ == "__main__":
