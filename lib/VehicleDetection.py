@@ -449,21 +449,24 @@ class VehicleDetection:
         # Run detection algorithm for single frame
         labels, heatmap, bbox = self.__detect_vehicles_frame(img_float)
 
-        data = labels[0] > 0
-        data = data.astype(np.int)
+        # Find currently detected vehicles
+        current_estimation = labels[0] > 0
+        current_estimation = current_estimation.astype(np.int)
 
         # Track detected vehicles
         if not self.tracking_heatmap_init:
+            # Init tracking algorithm
             self.tracking_heatmap_init = True
-            self.tracking_heatmap = data * 3
+            self.tracking_heatmap = current_estimation * 3
             result_img = img
         else:
+            # Decrease all elements by one (loose confidence)
             self.tracking_heatmap -= 1
-            self.tracking_heatmap = np.clip(self.tracking_heatmap + (data * 4), 0, 10)
+            # Increase tracking heatmap for current detections
+            self.tracking_heatmap = np.clip(self.tracking_heatmap + (current_estimation * 4), 0, 10)
 
+            # Threshold tracking heatmap and draw labels
             tr_heatmap = apply_threshold(np.copy(self.tracking_heatmap), 7)
-            # plt.imshow(tr_heatmap)
-            # plt.show()
             labels = label(tr_heatmap)
             result_img = draw_labeled_box(img, labels)
 

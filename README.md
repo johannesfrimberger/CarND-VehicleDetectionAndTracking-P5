@@ -17,7 +17,9 @@
 ####1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
 The implementation can be found in of the file `get_hog_features()` from the file `Features.py`.
-In the `VehicleDetection` class a wrapper method `__get_hog_features()` exists to calculate the features with
+In the `VehicleDetection` class a wrapper method `__get_hog_features()` exists to calculate the features with the current settings specified in the configuration file.
+
+
 
 The features are either returned as a 1D vector or as a matrix.
 Later is helpful when applying the sliding windows as we do not need to calculate the hog features for each window but once for the whole image.
@@ -30,7 +32,14 @@ I tried several combinations of orientation, pixel per cell and cells per block.
 After visualizing the results I trained the classifier and checked the results on the video.
 
 In the end I choose parameters close to those mentioned in the lectures.
-Lowering the number of orientations gave worse results while
+
+```
+Orientation: 9
+PixelPerCell: 8
+CellPerBlock: 2
+```
+
+Lowering the number of orientations gave worse results while increasing the number did not really boost the performance.
 
 The hog features where extracted for all three channels of the image after transforming it to another color space (I used YCrCb in the end.)
 
@@ -82,22 +91,51 @@ Some false positives occur but their number is rather low.
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
 Here's a [link to my video result](./results/project_video.mp4)
 
-
 ####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
-I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.
-
-Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
-
-### Here are six frames and their corresponding heatmaps:
 
 ![alt text][image5]
 
-### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
 ![alt text][image6]
 
-### Here the resulting bounding boxes are drawn onto the last frame in the series:
 ![alt text][image7]
+
+To improve stability the results of several consecutive frames are combined to a single heatmap.
+
+The code below shows this approach:
+```
+# Find currently detected vehicles
+current_estimation = labels[0] > 0
+current_estimation = current_estimation.astype(np.int)
+
+if not self.tracking_heatmap_init:
+    # Init tracking algorithm
+    self.tracking_heatmap_init = True
+    self.tracking_heatmap = current_estimation * 3
+    result_img = img
+else:
+    # Decrease all elements by one (loose confidence)
+    self.tracking_heatmap -= 1
+    # Increase tracking heatmap for current detections
+    self.tracking_heatmap = np.clip(self.tracking_heatmap + (current_estimation * 4), 0, 10)
+
+    # Threshold tracking heatmap and draw labels
+    tr_heatmap = apply_threshold(np.copy(self.tracking_heatmap), 7)
+    labels = label(tr_heatmap)
+    result_img = draw_labeled_box(img, labels)
+```
+This code can be found in the `__detect_vehicles_video()` method.
+
+The `current_estimation` is derived from the heatmap labeled image shown below.
+Wherever a vehicle is detected it has 1, anywhere else the value is 0.
+
+For the first cycle the tracking is initialized and the `current_estimation` is multiplied with 3 and stored in the internal variable `tracking_heatmap`
+For all consecutive frames the `tracking_heatmap` is decreased by 1 for all pixels where no vehicle was detected and increased by 3 for detections.
+The results are saturated to a range between 0 und 10.
+These parameters where chosen heuristically.
+
+Whenever a pixel has a value bigger than 7 it is detected as a vehicle and annotated in the image.
+This means that at least 3 detections in consecutive frames are necessary to initially detect a vehicle.
 
 ---
 
@@ -115,5 +153,4 @@ speed but improved the results as the cut-out images showed a lot of discontinui
 only be done by viewing and manually checking the results. This shows the need for tons of labeled data.
 - The detection of vehicles in the image using a SVC is not quite stable. It takes a lot of effort to overcome
 the shortcomings like heatmap and
-- In the future the results of the sequential frames should get low passed and predicted using
-e.g. a Kalman filter to improve the results. Transforming the bounding boxes to a birds eye view (perspective transform as in lane finding project) makes the tracking and the results independent of image distortions.
+- In the future the results of the sequential frames should not only get low passed but predicted using e.g. a Kalman filter to improve the results. Transforming the bounding boxes to a birds eye view (perspective transform as in lane finding project) makes the tracking and the results independent of image distortions.
