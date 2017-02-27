@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 def apply_threshold(img, threshold):
     """
-
+    Apply threshold to image
     :param img: Single channel 2d array
     :param threshold:
     :return:
