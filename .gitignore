@@ -5,3 +5,4 @@ data/
 results/classifier/
 results/images/
 results/videos/
+vis.py

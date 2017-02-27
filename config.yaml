@@ -1,11 +1,10 @@
 Common:
-  Visualization: False
   ColorSpace: YCRCB
 Video:
   Process: True
   InputFile:
-    - data/videos/short_project_video.mp4
-    #- data/videos/project_video.mp4
+    #- data/videos/short_project_video.mp4
+    - data/videos/project_video.mp4
     #- data/videos/challenge_video.mp4
     #- data/videos/harder_challenge_video.mp4
   StorageFolder: results/videos
@@ -16,15 +15,18 @@ Image:
   StorageFolder: results/images
 Classifier:
   UseStoredFile: True
+  Visualization: True
   HogFeatures: True
-  HistFeatures: True
-  SpatialFeatures: True
-  Folder: results/classifier
+  HogChannel: -1
   Orientation: 9
   PixelPerCell: 8
   CellPerBlock: 2
-  HogChannel: -1
+  HistFeatures: True
+  NBins: 16
+  SpatialFeatures: True
   SpatialSize: (16,16)
+  Folder: results/classifier
 SlidingWindow:
-  xyWindow: (256, 256), (128, 128), (96, 96)
-  xyOverlap: (0.5, 0.5)
+  Scaling: 1.5, 1.25, 1.0
+  CellsPerStep: 2
+  YStartStop: (400, 656)
