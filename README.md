@@ -3,9 +3,9 @@
 [//]: # (Image References)
 [image1]: ./results/overview_training_images.png
 [image2]: ./results/overview_features.png
-[image3]: ./results/sliding_windows.jpg
-[image4]: ./results/overview_still_images.jpg
-[image5]: ./results/overview_still_images.png
+[image3]: ./results/sliding_windows.png
+[image4]: ./results/overview_still_images.png
+[image5]: ./results/overview_video_frames.png
 [image6]: ./results/labels_map.png
 [image7]: ./results/output_bboxes.png
 [video1]: ./results/project_video.mp4
