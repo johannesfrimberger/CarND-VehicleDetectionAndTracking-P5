@@ -1,24 +1,14 @@
 **Vehicle Detection Project**
 
-The goals / steps of this project are the following:
-
-* Perform a Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
-* Optionally, you can also apply a color transform and append binned color features, as well as histograms of color, to your HOG feature vector.
-* Note: for those first two steps don't forget to normalize your features and randomize a selection for training and testing.
-* Implement a sliding-window technique and use your trained classifier to search for vehicles in images.
-* Run your pipeline on a video stream (start with the test_video.mp4 and later implement on full project_video.mp4) and create a heat map of recurring detections frame by frame to reject outliers and follow detected vehicles.
-* Estimate a bounding box for vehicles detected.
-
 [//]: # (Image References)
 [image1]: ./results/overview_training_images.png
 [image2]: ./results/overview_features.png
 [image3]: ./results/sliding_windows.jpg
-[image4]: ./results/sliding_window.jpg
-[image5]: ./results/bboxes_and_heat.png
+[image4]: ./results/overview_still_images.jpg
+[image5]: ./results/overview_still_images.png
 [image6]: ./results/labels_map.png
 [image7]: ./results/output_bboxes.png
 [video1]: ./results/project_video.mp4
-[video2]: ./results/project_video_combined.mp4
 
 ---
 
@@ -26,46 +16,55 @@ The goals / steps of this project are the following:
 
 ####1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in the first code cell of the IPython notebook (or in lines # through # of the file called `some_file.py`).
-
-I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
+The implementation can be found in `Utils.py`
 
 ![alt text][image1]
-
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
-
-Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
 
 
 ![alt text][image2]
 
 ####2. Explain how you settled on your final choice of HOG parameters.
 
-I tried various combinations of parameters and...
+
 
 ####3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
-I trained a linear SVM using...
+
 
 ###Sliding Window Search
 
 ####1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-I decided to search random window positions at random scales all over the image and came up with this (ok just kidding I didn't actually ;):
+The final implantation of the sliding window search can be found in the `__detect_vehicles_frame()` method of the
+`VehicleDetection` class.
+
+
+The overlap was chosen to be 0.25. This means that it takes 4 steps to make a complete step.
+Further the search region was limited to an area relevant for vehicles starting at height 400px and going to
+656px.
+
+This is visualized in the image below with 96x96 windows shown in green and 64x64 are annotated in blue.
 
 ![alt text][image3]
 
 ####2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
-Ultimately I searched on two scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
+The pipeline works quite well on still images.
+It detects the vehicles in the images on your lane and even is capable of detecting images on the other
+traffic lanes.
+
+Some false positives occur but their number is rather low.
 
 ![alt text][image4]
+
 ---
 
 ### Video Implementation
 
+Training
+
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./results/project_video.mp4)
 
 
 ####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
@@ -90,12 +89,17 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
--
--
--
-
----
-
-###Combined LaneDetection and VehicleTracking
-
-Here's a [link to my video result](./project_video_combined.mp4)
+- Incompatible image data types caused problems at the beginning.
+The training images where provided in png and read in floating point representation while the
+test images and video frames hat a UInt8 representation. This showed that carefully looking
+at the data before applying machine learning approaches is very important.
+- Calculating the hog features for the whole image and not for the search window not only improved
+speed but improved the results as the cut-out images showed a lot of discontinuities.
+- Comparing results is complicated if you don't have a ground truth available. Optimizing the parameters can
+only be done by viewing and manually checking the results. This shows the need for tons of labeled data.
+- The detection of vehicles in the image using a SVC is not quite stable. It takes a lot of effort to overcome
+the shortcomings like heatmap and
+- In the future the results of the sequential frames should not only be low passed but predicted using
+e.g. a Kalman filter to improve the results. Transforming the bounding boxes to a birds eye view
+(perspective transform as in lane finding project) makes the tracking and the results independent of
+image distortions.
