@@ -19,12 +19,14 @@
 The implementation can be found in of the file `get_hog_features()` from the file `Features.py`.
 In the `VehicleDetection` class a wrapper method `__get_hog_features()` exists to calculate the features with the current settings specified in the configuration file.
 
-
-
 The features are either returned as a 1D vector or as a matrix.
 Later is helpful when applying the sliding windows as we do not need to calculate the hog features for each window but once for the whole image.
 
+A visualization of the HOG features shows that the orientation of the gradient of the single cells give quite a lot of vertical and horizontal lines. The shape of the car can still be estimated.
+For non-vehicle images such a shape is not identifiable.
 ![alt text][image2]
+
+The image also shows the histogram feature for the HLS color space.
 
 ####2. Explain how you settled on your final choice of HOG parameters.
 
@@ -93,14 +95,21 @@ Here's a [link to my video result](./results/project_video.mp4)
 
 ####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
+First all windows, for which the classifier returns "vehicle" are summed up in a heatmap.
 
 ![alt text][image5]
 
+A real vehicle shows multiple detections for different sized sliding windows.
+That's why the heatmap is thresholded and only areas with multiple detections are considered further on.
+
+The `scipy.ndimage.measurements.label()` is used to cluster the heatmap into single "vehicles". It labels each enclosed heatmap area into a separate cluster which is indicated by the different brightness levels.
+
 ![alt text][image6]
 
+In the end these results are taken to create the annotated image:
 ![alt text][image7]
 
-To improve stability the results of several consecutive frames are combined to a single heatmap.
+To improve stability the results of several consecutive frames are combined to a single heatmap. This is more or less low-pass filter.
 
 The code below shows this approach:
 ```
