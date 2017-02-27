@@ -7,7 +7,7 @@
 [image4]: ./results/overview_still_images.png
 [image5]: ./results/overview_video_frames.png
 [image6]: ./results/labels_map.png
-[image7]: ./results/output_bboxes.png
+[image7]: ./results/output_bboxes.jpg
 [video1]: ./results/project_video.mp4
 
 ---
@@ -18,18 +18,34 @@
 
 The implementation can be found in `Utils.py`
 
-![alt text][image1]
-
-
 ![alt text][image2]
 
 ####2. Explain how you settled on your final choice of HOG parameters.
 
+I tried several combinations of orientation, pixel per cell and cells per block.
+Lowering the number of orientations
 
+In the end I choose parameters close to those mentioned in the lectures.
 
 ####3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
+The training of the classifier takes place in the `__train_classifier()` method of the
+`VehicleDetection` class.
 
+It first reads the dataset. You can choose wether to read the combined GTI, KITTI and project dataset or the Udacity released labeled dataset.
+This image shows an example of the vehicle and non-vehicle class.
+
+![alt text][image1]
+
+Afterwards this data is shuffled and split into a training and test set.
+The test set was chosen with 10% and is relatively small as the test set is not completely independent.
+The dataset contains many consecutive frames and additional work would be necessary to
+have a dataset with independent images and therefore a real quality measurement.
+
+From training and test set we extract HOG, color histogram and spatial features.
+The data is normalized and deals as input for a linear Support Vector Classifier.
+
+The results are stored and can be re-used later on.
 
 ###Sliding Window Search
 
