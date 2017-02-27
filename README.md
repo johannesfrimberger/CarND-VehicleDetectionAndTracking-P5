@@ -16,16 +16,23 @@
 
 ####1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The implementation can be found in `Utils.py`
+The implementation can be found in of the file `get_hog_features()` from the file `Features.py`.
+In the `VehicleDetection` class a wrapper method `__get_hog_features()` exists to calculate the features with
+
+The features are either returned as a 1D vector or as a matrix.
+Later is helpful when applying the sliding windows as we do not need to calculate the hog features for each window but once for the whole image.
 
 ![alt text][image2]
 
 ####2. Explain how you settled on your final choice of HOG parameters.
 
 I tried several combinations of orientation, pixel per cell and cells per block.
-Lowering the number of orientations
+After visualizing the results I trained the classifier and checked the results on the video.
 
 In the end I choose parameters close to those mentioned in the lectures.
+Lowering the number of orientations gave worse results while
+
+The hog features where extracted for all three channels of the image after transforming it to another color space (I used YCrCb in the end.)
 
 ####3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
@@ -51,13 +58,11 @@ The results are stored and can be re-used later on.
 
 ####1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-The final implantation of the sliding window search can be found in the `__detect_vehicles_frame()` method of the
-`VehicleDetection` class.
+The final implantation of the sliding window search can be found in the `__detect_vehicles_frame()` method of the `VehicleDetection` class.
 
-
-The overlap was chosen to be 0.25. This means that it takes 4 steps to make a complete step.
-Further the search region was limited to an area relevant for vehicles starting at height 400px and going to
-656px.
+In this implantation we do not set the explicit window size but work with a 64x64 window all of time and rescale the image. We use a scaling of 1.5, 1.25 and 1.0 what corresponds to 96x96, 80x80 and 64x64 search windows.
+The overlap was chosen to be 0.25. This means that it takes 4 windows to make a complete "step".
+Further the search region was limited to an area relevant for vehicles starting at height 400px and going to 656px.
 
 This is visualized in the image below with 96x96 windows shown in green and 64x64 are annotated in blue.
 
@@ -66,18 +71,13 @@ This is visualized in the image below with 96x96 windows shown in green and 64x6
 ####2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
 The pipeline works quite well on still images.
-It detects the vehicles in the images on your lane and even is capable of detecting images on the other
-traffic lanes.
-
+It detects the vehicles in the images on your lane and even is capable of detecting images on the other traffic lanes.
 Some false positives occur but their number is rather low.
 
 ![alt text][image4]
-
 ---
 
 ### Video Implementation
-
-Training
 
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
 Here's a [link to my video result](./results/project_video.mp4)
@@ -115,7 +115,5 @@ speed but improved the results as the cut-out images showed a lot of discontinui
 only be done by viewing and manually checking the results. This shows the need for tons of labeled data.
 - The detection of vehicles in the image using a SVC is not quite stable. It takes a lot of effort to overcome
 the shortcomings like heatmap and
-- In the future the results of the sequential frames should not only be low passed but predicted using
-e.g. a Kalman filter to improve the results. Transforming the bounding boxes to a birds eye view
-(perspective transform as in lane finding project) makes the tracking and the results independent of
-image distortions.
+- In the future the results of the sequential frames should get low passed and predicted using
+e.g. a Kalman filter to improve the results. Transforming the bounding boxes to a birds eye view (perspective transform as in lane finding project) makes the tracking and the results independent of image distortions.
